@@ -437,6 +437,22 @@ async function handleBoost(member: GuildMember, boostDate: Date, type: 'new' | '
 }
 
 async function executeRoleAction(member: GuildMember, action: typeof roleAction.$inferSelect) {
+    // Check required role conditions before executing
+    if (action.requiredRoleIds && action.requiredRoleIds.length > 0) {
+        const memberRoleIds = Array.from(member.roles.cache.keys());
+        const logic = action.requiredRoleLogic || 'AND';
+        let conditionMet: boolean;
+        if (logic === 'AND') {
+            conditionMet = action.requiredRoleIds.every(id => memberRoleIds.includes(id));
+        } else {
+            conditionMet = action.requiredRoleIds.some(id => memberRoleIds.includes(id));
+        }
+        if (!conditionMet) {
+            logger.debug(`Skipping role action ${action.id}: required role condition (${logic}) not met for ${member.user.tag}`);
+            return;
+        }
+    }
+
     const delayMs = (action.actionDelay || 0) * 60 * 1000;
 
     const runAction = async () => {

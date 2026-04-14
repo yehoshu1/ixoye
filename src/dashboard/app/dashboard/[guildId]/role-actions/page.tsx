@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
+import { RoleSelect, ChannelSelect, RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from "../../../../components/ui/card";
@@ -26,6 +26,8 @@ interface RoleAction {
     kickReason: string | null;
     logChannelId: string | null;
     enabled: boolean;
+    requiredRoleIds: string[];
+    requiredRoleLogic: "AND" | "OR";
 }
 
 export default function RoleActionsPage() {
@@ -128,6 +130,8 @@ export default function RoleActionsPage() {
                             kickReason: "",
                             logChannelId: "",
                             enabled: true,
+                            requiredRoleIds: [],
+                            requiredRoleLogic: "AND",
                         });
                         setModalOpen(true);
                     }}
@@ -216,6 +220,8 @@ export default function RoleActionsPage() {
                                     kickReason: "",
                                     logChannelId: "",
                                     enabled: true,
+                                    requiredRoleIds: [],
+                                    requiredRoleLogic: "AND",
                                 });
                                 setModalOpen(true);
                             }}
@@ -359,6 +365,39 @@ export default function RoleActionsPage() {
                                     />
                                 </div>
                             )}
+
+                            <div className="space-y-2 border-t pt-4">
+                                <LabelWithTooltip
+                                    label="Required Roles (Optional)"
+                                    tooltip="Only execute this action if the user also has (or doesn't have) these roles. Leave empty to always execute."
+                                />
+                                <RoleMultiSelect
+                                    guildId={guildId}
+                                    values={editingAction?.requiredRoleIds || []}
+                                    onChange={(values) => setEditingAction({ ...editingAction!, requiredRoleIds: values })}
+                                />
+                                <HelperText>If roles are selected, the action only runs when the condition below is met.</HelperText>
+                                {(editingAction?.requiredRoleIds?.length ?? 0) > 0 && (
+                                    <div className="space-y-2 pt-1">
+                                        <LabelWithTooltip
+                                            label="Logic"
+                                            tooltip="AND: user must have ALL selected roles. OR: user must have AT LEAST ONE of the selected roles."
+                                        />
+                                        <Select
+                                            value={editingAction?.requiredRoleLogic || "AND"}
+                                            onValueChange={(value) => setEditingAction({ ...editingAction!, requiredRoleLogic: value as "AND" | "OR" })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="AND">AND – user must have ALL required roles</SelectItem>
+                                                <SelectItem value="OR">OR – user must have ANY required role</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                         <CardFooter className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>

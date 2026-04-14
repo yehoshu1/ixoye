@@ -15,6 +15,7 @@ import {
 
 export const roleActionTriggerEnum = pgEnum('role_action_trigger', ['ADD', 'REMOVE']);
 export const roleActionTypeEnum = pgEnum('role_action_type', ['DM', 'KICK', 'LOG', 'MSG', 'MESSAGE']);
+export const roleActionLogicEnum = pgEnum('role_action_logic', ['AND', 'OR']);
 export const welcomeTargetTypeEnum = pgEnum('welcome_target_type', ['CHANNEL', 'DM']);
 export const welcomeBackgroundTypeEnum = pgEnum('welcome_background_type', ['COLOR', 'GRADIENT', 'IMAGE']);
 export const welcomeAvatarShapeEnum = pgEnum('welcome_avatar_shape', ['CIRCLE', 'SQUARE', 'ROUNDED']);
@@ -245,6 +246,8 @@ export const roleAction = pgTable('role_action', {
     kickReason: text('kick_reason'),
     logChannelId: text('log_channel_id'),
     enabled: boolean('enabled').default(true).notNull(),
+    requiredRoleIds: text('required_role_ids').array().default([]).notNull(),
+    requiredRoleLogic: roleActionLogicEnum('required_role_logic').default('AND').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 }, (table) => ({
