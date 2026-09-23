@@ -1,0 +1,34 @@
+# Generic Caddy config for Ixoye production (docker-compose.prod.yml).
+# DOMAIN and optional ACME_EMAIL come from the environment (.env / compose).
+# Caddy expands {$VAR} placeholders. Real hostnames get automatic HTTPS;
+# localhost stays HTTP.
+
+# Optional: uncomment and set a contact email for Let's Encrypt expiry notices
+# {
+# 	email admin@example.com
+# }
+
+{$DOMAIN} {
+	encode gzip
+
+	reverse_proxy ixoye:4002 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+	}
+
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}

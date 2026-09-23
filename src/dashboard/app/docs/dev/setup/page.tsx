@@ -46,7 +46,7 @@ const envRows = [
     {
         key: "DOMAIN",
         required: "Optional",
-        description: "Domain for Traefik routing and cookie scope.",
+        description: "Public hostname for Caddy (docker-compose.prod.yml).",
     },
     {
         key: "DASHBOARD_URL",

@@ -1,75 +1,102 @@
 ---
 title: "Docker Deployment"
-description: "How to deploy Ixoye using Docker, Dokploy, or Coolify."
+description: "How to deploy Ixoye with Docker Compose — production (Caddy) or development."
 ---
 
-Ixoye is built to run flawlessly in containerized environments. A single `docker-compose.yml` file is provided that orchestrates the entire application, including the Node.js API/Dashboard, PostgreSQL database, Redis caching, and automated database backups.
+Ixoye ships with Compose files for production and development. Each stack runs the bot/dashboard, PostgreSQL 17, and automated backups.
 
-## Using the Built-in CLI (Recommended)
+| File | Use when | Reverse proxy |
+|------|----------|---------------|
+| `docker-compose.prod.yml` | **Production** on your own VPS or server | **Bundled Caddy** (auto HTTPS) |
+| `docker-compose.yml` | Default / simple start without the bundled proxy | None (app on `127.0.0.1:4002`) |
+| `docker-compose.dev.yml` | Local development with source mounts | None (app on `${PORT:-4002}`) |
 
-The absolute easiest way to deploy and manage Ixoye on a VPS (like a DigitalOcean droplet or AWS EC2 instance) is using our built-in Node CLI wrapper. 
+Use `-f` to pick a file. Stacks do not share volumes unless you configure them to.
 
-The CLI automatically handles database backups, code pulls, container rebuilding, and automatic rollbacks if a build fails.
+## Production with Caddy (recommended)
 
-### 1. Configure your environment
-Create your `.env` file from the example:
+`docker-compose.prod.yml` is general-purpose: no hardcoded domain. You set `DOMAIN` and public URLs in `.env`. See `Caddyfile`.
+
+### 1. Configure environment
+
 ```bash
 cp .env.example .env
 ```
-Ensure you set your domains properly so Traefik knows how to route traffic:
+
+Set at least:
+
 ```bash
-DOMAIN=bot.yourdomain.com
-DASHBOARD_URL=https://bot.yourdomain.com
+DOMAIN=bot.example.com                 # your public hostname
+DASHBOARD_URL=https://bot.example.com
+NEXTAUTH_URL=https://bot.example.com
+TRUSTED_ORIGINS=https://bot.example.com
+OAUTH_REDIRECT_URI=https://bot.example.com/oauth/callback
+POSTGRES_PASSWORD=change_me
+NEXTAUTH_SECRET=                       # openssl rand -base64 32
 ```
 
-### 2. Deploy
-Run the deployment command:
-```bash
-npm run cli -- deploy
-```
-The CLI will build the Docker images and start the services. 
+Point DNS for `DOMAIN` at the server. Open ports **80** and **443**.
 
-### 3. Updating Safely
-When there is a new update to Ixoye, simply run:
+### 2. Start
+
 ```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Caddy reverse-proxies to the app and obtains Let’s Encrypt certificates for real hostnames. Postgres is not published on the host; the app is bound to `127.0.0.1:4002` behind Caddy.
+
+### 3. Migrate and deploy commands
+
+```bash
+docker compose -f docker-compose.prod.yml exec ixoye npm run db:migrate
+docker compose -f docker-compose.prod.yml exec ixoye npm run deploy
+```
+
+### 4. Updates
+
+```bash
+# Preferred (backup → pull → rebuild → rollback on failure)
 npm run cli -- update
+
+# Or manually
+docker compose -f docker-compose.prod.yml exec ixoye npm run cli -- backup
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
 ```
-This single command will:
-1. Run a full PostgreSQL database backup.
-2. `git pull` the latest code.
-3. Rebuild and restart the Docker containers.
-4. **Automatically rollback** the codebase and containers to the previous version if the build fails.
 
-## Platform as a Service (Dokploy / Coolify)
+> The CLI’s default `docker compose up` uses `docker-compose.yml`. For the prod file, pass the same `-f`, or set `COMPOSE_FILE=docker-compose.prod.yml` in your shell or `.env`.
 
-Because Ixoye is entirely self-contained within its `docker-compose.yml` and `Dockerfile`, it is perfectly optimized for PaaS platforms like [Dokploy](https://dokploy.com/) or [Coolify](https://coolify.io/).
+## Default compose (`docker-compose.yml`)
 
-### Dokploy Integration
-The `docker-compose.yml` file comes pre-configured with Traefik labels specifically designed for Dokploy's network.
+Same core services without the bundled reverse proxy — useful behind an existing host proxy or for a quick local check:
 
-To deploy on Dokploy:
-1. Create a new **Compose** application in your Dokploy dashboard.
-2. Link it to your GitHub repository.
-3. In the environment variables section, paste your `.env` file.
-4. Click **Deploy**. Dokploy will automatically route the domain you defined in `DOMAIN` and provision SSL certificates with zero extra setup.
-
-### Coolify Integration
-Coolify manages its own reverse proxy (Caddy/Traefik). 
-To deploy on Coolify:
-1. Create a new application from a GitHub repository.
-2. Select **Docker Compose** as the build pack.
-3. Tell Coolify that the container exposes port `4002`.
-4. Type your domain name into the Coolify UI. Coolify will ignore the Traefik labels in the compose file and automatically generate its own secure proxy routing to port `4002`.
-
-## Database Backups in Docker
-
-Our Docker stack includes a dedicated `ixoye-pg-backup` container that automatically backs up your PostgreSQL database daily. 
-
-If you need to manually trigger a backup or restore, use the CLI:
 ```bash
-# Trigger a manual backup
-npm run cli -- backup
-
-# Interactively restore from a previous backup
-npm run cli -- restore
+docker compose up -d
 ```
+
+The app listens on `127.0.0.1:4002` only. Put your own proxy in front and set `TRUST_PROXY_DEPTH=1`.
+
+## PaaS (Coolify, etc.)
+
+Any platform that runs Docker Compose works. Prefer **`docker-compose.prod.yml`** (or the default file if the platform terminates TLS itself). Map the platform proxy to port **4002** and set `DOMAIN` / URL variables in the platform UI.
+
+## Development
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml logs -f ixoye-dev
+docker compose -f docker-compose.dev.yml down
+```
+
+## CLI
+
+```bash
+npm run cli -- deploy    # build + up (default compose file)
+npm run cli -- update    # backup, pull, rebuild, rollback on failure
+npm run cli -- backup    # one-off Postgres backup
+npm run cli -- restore   # interactive restore
+```
+
+## Database backups
+
+The `ixoye-pg-backup` service dumps PostgreSQL on an interval (`BACKUP_INTERVAL_SECONDS`, default daily) and keeps `BACKUP_RETENTION_COUNT` copies under `./backups`.

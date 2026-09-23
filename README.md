@@ -57,6 +57,10 @@ cp .env.example .env
 ### 2. Start the Application
 
 ```bash
+# Production with bundled Caddy (set DOMAIN + public URLs in .env) — recommended
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Default (no reverse proxy; app on 127.0.0.1:4002)
 docker compose up -d
 ```
 
@@ -152,7 +156,7 @@ The bot is configured via environment variables. Copy `.env.example` to `.env` a
 | Variable | Description |
 |----------|-------------|
 | `DASHBOARD_URL` | Public URL for the dashboard (for `/dashboard` command) |
-| `DOMAIN` | Domain name (for Docker/Traefik routing) |
+| `DOMAIN` | Public hostname for Caddy (`docker-compose.prod.yml`) |
 | `METRICS_TOKEN` | Token to protect health/metrics endpoints |
 | `WEBHOOK_SECRET_ENCRYPTION_KEY` | Encrypts webhook secrets (min 16 chars) |
 | `ANONYMIZE_SECRET` | Anonymizes poll votes (min 16 chars) |
@@ -165,7 +169,7 @@ See `.env.example` for all configuration options with explanations.
 
 1. **Never commit your `.env` file** - It's in `.gitignore` for a reason
 2. **Use strong passwords** for PostgreSQL - Don't use weak defaults
-3. **Enable HTTPS** - Use a reverse proxy (nginx, Traefik, Caddy) with TLS
+3. **Enable HTTPS** - Use `docker-compose.prod.yml` (bundled Caddy) or another reverse proxy with TLS
 4. **Protect health endpoints** - Set `METRICS_TOKEN` in production
 5. **Keep secrets encrypted** - Use `WEBHOOK_SECRET_ENCRYPTION_KEY` and `ANONYMIZE_SECRET`
 6. **Regular backups** - Automated backups are included with Docker

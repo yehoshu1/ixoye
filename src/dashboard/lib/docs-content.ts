@@ -1353,6 +1353,11 @@ export const setupSections = [
             "npm run start",
             "npm run dashboard:start",
             "docker compose up -d --build",
+            "docker compose -f docker-compose.prod.yml up -d --build",
+        ],
+        bullets: [
+            "Production: docker-compose.prod.yml bundles Caddy — set DOMAIN and public URLs in .env.",
+            "Default docker-compose.yml has no reverse proxy (app on 127.0.0.1:4002).",
         ],
     },
     {

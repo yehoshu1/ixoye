@@ -264,6 +264,13 @@ df -h
 
 ### Symptom: `docker compose up` fails with "port already in use"
 
+**Check which stack is running and which file you are starting:**
+```bash
+docker compose ps
+# If you use the Caddy stack:
+docker compose -f docker-compose.prod.yml ps
+```
+
 **Solution:**
 ```bash
 # Find what's using port 4002
@@ -309,7 +316,8 @@ docker compose down -v  # WARNING: Deletes all data!
 ```
 
 **Solutions:**
-- Ensure volumes are defined in `docker-compose.yml`
+- Ensure volumes are defined in the compose file you use (`docker-compose.yml` or `docker-compose.prod.yml`)
+- Always pass the same `-f` (or `COMPOSE_FILE`) you started with
 - Don't use `docker compose down -v` in production (deletes data)
 
 ---

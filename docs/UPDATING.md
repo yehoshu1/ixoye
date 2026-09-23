@@ -67,10 +67,14 @@ git pull
 
 # 2. Rebuild and restart containers
 docker compose up -d --build
+# Using the Caddy production file instead:
+# docker compose -f docker-compose.prod.yml up -d --build
 
 # 3. View logs to verify startup
 docker compose logs -f ixoye
 ```
+
+> If you deploy with `docker-compose.prod.yml`, use that `-f` flag for every compose command (or set `COMPOSE_FILE=docker-compose.prod.yml`). The CLI default targets `docker-compose.yml`.
 
 ### Manual Update
 
