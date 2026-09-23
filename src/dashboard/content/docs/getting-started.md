@@ -78,7 +78,7 @@ openssl rand -base64 32
 | `ANONYMIZE_SECRET` | Yes (anonymous polls) | Secret for anonymizing user IDs in anonymous polls (minimum 16 characters). |
 | `METRICS_TOKEN` | Optional (recommended in prod) | Bearer token required to access `GET /api/metrics` in production. |
 | `REDIS_URL` | Optional (recommended in prod) | Enables distributed dashboard rate limiting/cache across multiple app instances. Requires `ioredis` package installed. |
-| `DOMAIN` | Yes (for Docker/Traefik) | Base domain used by Traefik router to proxy web traffic in production deployments. |
+| `DOMAIN` | Yes (prod compose / Caddy) | Public hostname for the reverse proxy in `docker-compose.prod.yml`. |
 
 ### Common Local Values
 
@@ -109,7 +109,7 @@ The dashboard uses optional Redis-backed rate limiting for multi-instance deploy
   1. Install the optional dependency: `npm install ioredis`
   2. Set `REDIS_URL` environment variable
   3. Rate limits are shared across all instances
-  4. Add Redis service to docker-compose (already configured in dev/prod compose files)
+  4. Optionally run a Redis container beside the stack and set `REDIS_URL` (not included in the compose files by default)
   
 - **Without Redis:** 
   - Falls back to in-memory LRU cache automatically
@@ -230,27 +230,28 @@ Run dashboard:
 npm run dashboard:start
 ```
 
-## 8. Production Docker (Using Built-in CLI)
+## 8. Production Docker
 
-Build and deploy the application safely:
+**Recommended — Caddy stack (`docker-compose.prod.yml`):**
+
+```bash
+# Requires DOMAIN and public https URLs in .env
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec ixoye npm run db:migrate
+docker compose -f docker-compose.prod.yml exec ixoye npm run deploy
+```
+
+**CLI helpers (default `docker-compose.yml`):**
 
 ```bash
 npm run cli -- deploy
-```
-
-Safely update the application (automatic backup, pull, build, rollback on failure):
-
-```bash
-npm run cli -- update
-```
-
-Read logs:
-
-```bash
+npm run cli -- update   # backup, pull, build, rollback on failure
 npm run cli -- logs
 ```
 
-The production image uses PM2 runtime (`ecosystem.config.js`).
+Set `COMPOSE_FILE=docker-compose.prod.yml` if you want the CLI to target the Caddy stack.
+
+The production image uses PM2 runtime (`ecosystem.config.js`). See **[Docker Deployment](/docs/docker)** for details.
 
 ## 9. Command Deployment to Discord
 
