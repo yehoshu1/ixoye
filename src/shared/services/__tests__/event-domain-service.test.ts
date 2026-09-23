@@ -170,13 +170,14 @@ describe('eventService.createEvent', () => {
         expect(insertedData.durationMinutes).toBe(90);
     });
 
-    it('defaults durationMinutes to 60 when neither endTime nor durationMinutes is provided', async () => {
-        dbInsertReturningMock.mockResolvedValueOnce([makeEventRow()]);
+    it('leaves durationMinutes null when neither endTime nor durationMinutes is provided', async () => {
+        dbInsertReturningMock.mockResolvedValueOnce([makeEventRow({ durationMinutes: null })]);
 
         await eventService.createEvent(makeCreateData({ mirrorToDiscord: true }));
 
         const insertedData = dbInsertValuesMock.mock.calls[0][0];
-        expect(insertedData.durationMinutes).toBe(60);
+        expect(insertedData.durationMinutes).toBeNull();
+        expect(insertedData.endTime).toBeNull();
     });
 
     it('fires a webhook after successful creation', async () => {

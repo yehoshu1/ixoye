@@ -15,15 +15,17 @@ function getEffectiveEndTime(eventData: {
     startTime: Date;
     endTime: Date | null;
     durationMinutes: number | null;
-}): Date {
+}): Date | null {
     if (eventData.endTime) {
         return eventData.endTime;
     }
 
-    const minutes = eventData.durationMinutes && eventData.durationMinutes > 0
-        ? eventData.durationMinutes
-        : 60;
-    return new Date(eventData.startTime.getTime() + minutes * 60_000);
+    if (eventData.durationMinutes && eventData.durationMinutes > 0) {
+        return new Date(eventData.startTime.getTime() + eventData.durationMinutes * 60_000);
+    }
+
+    // No end time and no duration — never auto-complete from a fake end.
+    return null;
 }
 
 export async function execute(_client: Client) {
@@ -38,7 +40,7 @@ export async function execute(_client: Client) {
             }
 
             const effectiveEndTime = getEffectiveEndTime(evt);
-            if (effectiveEndTime <= now) {
+            if (effectiveEndTime && effectiveEndTime <= now) {
                 await eventService.markEventAsCompleted(evt.id);
                 logger.info(`Marked event ${evt.id} as completed`);
             }

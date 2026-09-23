@@ -21,7 +21,7 @@ const updateEventSchema = z.object({
     channelId: z.string().min(1).optional(),
     startTime: z.string().datetime().optional(),
     endTime: z.string().datetime().nullable().optional(),
-    durationMinutes: z.number().int().min(1).max(60 * 24 * 31).optional(),
+    durationMinutes: z.number().int().min(1).max(60 * 24 * 31).nullable().optional(),
     status: z.enum(['SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED']).optional(),
     maxAttendees: z.number().int().min(0).max(1000).optional(),
     enableWaitlist: z.boolean().optional(),
@@ -128,7 +128,7 @@ export async function PATCH(
         if (data.channelId !== undefined) updateData.channelId = data.channelId;
         if (data.startTime !== undefined) updateData.startTime = new Date(data.startTime);
         if (data.endTime !== undefined) updateData.endTime = data.endTime ? new Date(data.endTime) : null;
-        if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
+        if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes ?? null;
         if (data.status !== undefined) updateData.status = data.status;
         if (data.maxAttendees !== undefined) updateData.maxAttendees = data.maxAttendees;
         if (data.enableWaitlist !== undefined) updateData.enableWaitlist = data.enableWaitlist;
