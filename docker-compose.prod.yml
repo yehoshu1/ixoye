@@ -1,0 +1,123 @@
+# Production stack (general-purpose)
+# Usage:
+#   cp .env.example .env   # set DOMAIN, URLs, secrets — no server-specific defaults
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Caddy terminates TLS and reverse-proxies to the app. Set DOMAIN in .env
+# (e.g. bot.example.com). Do not commit real domains or secrets.
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: ixoye-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ixoye_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-ixoye} -d ${POSTGRES_DB:-ixoye}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Database is not published on the host; only containers on this network can reach it.
+
+  ixoye:
+    build: .
+    container_name: ixoye-app
+    restart: always
+    command:
+      - pm2-runtime
+      - start
+      - ecosystem.config.js
+    ports:
+      - "127.0.0.1:${PORT:-4002}:4002"
+    volumes:
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4002
+      TRUST_PROXY_DEPTH: "1"
+      PG_SSL: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ixoye}
+      # Set DASHBOARD_URL, NEXTAUTH_URL, TRUSTED_ORIGINS, and OAUTH_REDIRECT_URI
+      # in .env to your public https://DOMAIN — they are not defaulted here.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ixoye-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env (e.g. bot.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ixoye
+
+  ixoye-pg-backup:
+    image: postgres:17
+    container_name: ixoye-pg-backup
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /backups
+        while true; do
+          TS=$$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          DUMP_PATH="/backups/ixoye-$${TS}.dump"
+          pg_dump \
+            --host="$${POSTGRES_HOST}" \
+            --port="$${POSTGRES_PORT}" \
+            --username="$${POSTGRES_USER}" \
+            --format=custom \
+            --file="$${DUMP_PATH}" \
+            "$${POSTGRES_DB}"
+
+          KEEP="$${BACKUP_RETENTION_COUNT:-10}"
+          ls -1t /backups/*.dump 2>/dev/null | awk "NR>$${KEEP}" | xargs -r rm -f
+
+          sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
+        done
+
+volumes:
+  ixoye_pg_data:
+  caddy_data:
+  caddy_config:

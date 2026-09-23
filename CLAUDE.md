@@ -116,7 +116,8 @@ Security-sensitive vars: `WEBHOOK_SECRET_ENCRYPTION_KEY` (AES-256-GCM), `ANONYMI
 
 ```bash
 docker compose -f docker-compose.dev.yml up   # Development
-docker compose up                              # Production
+docker compose up                              # Default (no reverse proxy)
+docker compose -f docker-compose.prod.yml up -d --build  # Production + Caddy (set DOMAIN in .env)
 ```
 
-Production compose includes PostgreSQL 17, automated backups, and health checks.
+Production stacks include PostgreSQL 17, automated backups, and health checks. `docker-compose.prod.yml` adds Caddy for HTTPS.

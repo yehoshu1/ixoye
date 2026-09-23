@@ -263,13 +263,13 @@ NODE_ENV=development              # development, production
 PORT=4002                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
 DASHBOARD_URL=https://bot.ixoye.qzz.io  # For /dashboard command
-DOMAIN=bot.ixoye.qzz.io         # Domain for Traefik routing
+DOMAIN=bot.ixoye.qzz.io            # Public hostname for Caddy (prod compose)
 
 # Security (dashboard)
 # Comma-separated allowlist of origins for CSRF same-origin checks. When set,
 # client-supplied X-Forwarded-* headers are ignored for origin validation.
 TRUSTED_ORIGINS=https://bot.ixoye.qzz.io
-# Number of trusted proxies in front of the dashboard (e.g. 1 behind Traefik
+# Number of trusted proxies in front of the dashboard (e.g. 1 behind Caddy
 # or a reverse proxy). 0/unset = treat the app as directly exposed and ignore
 # X-Forwarded-For for rate limiting.
 TRUST_PROXY_DEPTH=1
@@ -580,13 +580,29 @@ When updating documentation:
 ## Deployment
 
 ### Docker (Recommended for Production)
-We use a robust CLI to handle deployments, which manages docker-compose under the hood.
+
+Compose files:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.prod.yml` | **Production** — bundled **Caddy**, no hardcoded domain |
+| `docker-compose.yml` | Default — app + Postgres + backups, no reverse proxy |
+| `docker-compose.dev.yml` | Development with source mounts |
+
+CLI targets the default compose file (set `COMPOSE_FILE=docker-compose.prod.yml` to aim it at the Caddy stack):
 ```bash
 # First-time build and deploy
 npm run cli -- deploy
 
 # Update safely (backup + git pull + rebuild + auto-rollback on failure)
 npm run cli -- update
+```
+
+For the Caddy production stack (set `DOMAIN` and public URLs in `.env` first):
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec ixoye npm run db:migrate
+docker compose -f docker-compose.prod.yml exec ixoye npm run deploy
 ```
 
 The Dockerfile uses multi-stage builds:

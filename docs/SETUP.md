@@ -73,12 +73,18 @@ ANONYMIZE_SECRET=$(openssl rand -hex 16)
 ### 3. Start the Services
 
 ```bash
+# Recommended production (bundled Caddy — set DOMAIN in .env)
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Or default stack (no reverse proxy; app on 127.0.0.1:4002)
 docker compose up -d
 ```
 
 This starts:
 - **PostgreSQL 17** - Database
 - **Ixoye App** - Bot + Dashboard (PM2 managed)
+- **Caddy** - Only with `docker-compose.prod.yml` (HTTPS reverse proxy)
+- **Backup service** - Scheduled Postgres dumps
 
 ### 4. Initialize the Database
 
@@ -91,6 +97,8 @@ For production, use migrations instead:
 ```bash
 docker compose exec ixoye npm run db:migrate
 ```
+
+If you started with `docker-compose.prod.yml`, prefix exec commands with `-f docker-compose.prod.yml` (or export `COMPOSE_FILE=docker-compose.prod.yml`).
 
 ### 5. Deploy Discord Commands
 
@@ -254,10 +262,14 @@ git pull
 
 # 3. Rebuild and restart
 docker compose up -d --build
+# Caddy prod file instead:
+# docker compose -f docker-compose.prod.yml up -d --build
 
 # 4. Run any pending migrations
 docker compose exec ixoye npm run db:migrate
 ```
+
+> Use the same compose file for every command you use to start the stack (default or `-f docker-compose.prod.yml`).
 
 ### Manual Update
 

@@ -17,3 +17,5 @@ polls, moderation, and more.
   required permissions, and examples.
 - **[Feature Guides](/docs/modules)** — module-by-module operations guide
   for moderators and server managers.
+- **[Docker Deployment](/docs/docker)** — default, Caddy production
+  (`docker-compose.prod.yml`), and development stacks.
