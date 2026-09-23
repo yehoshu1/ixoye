@@ -13,23 +13,28 @@ import { DateTime } from 'luxon';
  * - "2026-02-15 18:00"
  * - "today at 5pm"
  * - "saturday"
+ *
+ * `timezone` is the interpretation zone for wall-clock inputs without an
+ * explicit offset (server timezone). Values that already include an offset
+ * keep that absolute instant.
  */
 export function parseNaturalLanguageDate(input: string, timezone: string = 'UTC'): Date | null {
     const normalized = input.toLowerCase().trim();
-    const now = DateTime.now().setZone(timezone);
+    const zone = resolveZone(timezone);
+    const now = DateTime.now().setZone(zone);
 
-    // Try exact ISO/date formats first
-    const isoDate = DateTime.fromISO(normalized);
+    // Exact formats must be interpreted in the provided zone, not the host zone
+    const isoDate = DateTime.fromISO(normalized, { zone });
     if (isoDate.isValid) {
         return isoDate.toJSDate();
     }
 
-    const sqlDate = DateTime.fromSQL(normalized);
+    const sqlDate = DateTime.fromSQL(normalized, { zone });
     if (sqlDate.isValid) {
         return sqlDate.toJSDate();
     }
 
-    const httpDate = DateTime.fromHTTP(normalized);
+    const httpDate = DateTime.fromHTTP(normalized, { zone });
     if (httpDate.isValid) {
         return httpDate.toJSDate();
     }
@@ -59,6 +64,16 @@ export function parseNaturalLanguageDate(input: string, timezone: string = 'UTC'
     }
 
     return null;
+}
+
+function resolveZone(timezone: string): string {
+    if (!timezone) return 'UTC';
+    try {
+        const probe = DateTime.now().setZone(timezone);
+        return probe.isValid ? timezone : 'UTC';
+    } catch {
+        return 'UTC';
+    }
 }
 
 function parseRelativeTime(input: string, now: DateTime): DateTime | null {
