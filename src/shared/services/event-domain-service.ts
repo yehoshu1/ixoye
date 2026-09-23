@@ -13,7 +13,7 @@ export interface CreateEventData {
     description?: string;
     color?: string;
     endTime?: Date | null;
-    durationMinutes?: number;
+    durationMinutes?: number | null;
     location?: string;
     imageUrl?: string;
     maxAttendees?: number;
@@ -71,7 +71,7 @@ class EventDomainService {
         const normalizedDurationMinutes = data.durationMinutes
             ?? (data.endTime
                 ? Math.max(1, Math.round((data.endTime.getTime() - data.startTime.getTime()) / 60000))
-                : 60);
+                : null);
 
         const eventData: NewEvent = {
             guildId: data.guildId,
@@ -84,7 +84,7 @@ class EventDomainService {
             location: data.location,
             imageUrl: data.imageUrl,
             startTime: data.startTime,
-            endTime: data.endTime,
+            endTime: data.endTime ?? null,
             durationMinutes: normalizedDurationMinutes,
             maxAttendees: data.maxAttendees,
             enableWaitlist: data.enableWaitlist ?? false,

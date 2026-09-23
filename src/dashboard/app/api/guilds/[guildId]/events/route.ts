@@ -212,9 +212,10 @@ export async function POST(
 
         const startTime = new Date(data.startTime);
         const endTime = data.endTime ? new Date(data.endTime) : null;
-        const durationMinutes = data.durationMinutes as number | undefined;
-        const normalizedDurationMinutes = durationMinutes
-            ?? (endTime ? Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000)) : 60);
+        const durationMinutes = data.durationMinutes;
+        const normalizedDurationMinutes = durationMinutes !== undefined
+            ? durationMinutes
+            : (endTime ? Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000)) : null);
 
         const created = await eventService.createEvent({
             guildId,
