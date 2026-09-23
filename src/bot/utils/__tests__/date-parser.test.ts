@@ -39,6 +39,23 @@ describe('parseNaturalLanguageDate', () => {
             expect(result!.getUTCDate()).toBe(20);
             expect(result!.getUTCHours()).toBe(18);
         });
+
+        it('interprets wall-clock SQL dates in the provided zone, not the host zone', () => {
+            const result = parseNaturalLanguageDate('2026-07-15 18:00', 'America/New_York');
+            expect(result).toBeInstanceOf(Date);
+            // 2026-07-15 18:00 EDT (UTC-4) → 22:00 UTC
+            expect(result!.toISOString()).toBe('2026-07-15T22:00:00.000Z');
+        });
+
+        it('keeps absolute instants when the string includes an offset', () => {
+            const result = parseNaturalLanguageDate('2026-07-15T18:00:00Z', 'America/New_York');
+            expect(result!.toISOString()).toBe('2026-07-15T18:00:00.000Z');
+        });
+
+        it('falls back to UTC for an invalid zone', () => {
+            const result = parseNaturalLanguageDate('2026-03-20 18:00:00', 'Not/AZone');
+            expect(result!.toISOString()).toBe('2026-03-20T18:00:00.000Z');
+        });
     });
 
     describe('relative time — "in X unit"', () => {

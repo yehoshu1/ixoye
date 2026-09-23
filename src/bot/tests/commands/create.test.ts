@@ -205,7 +205,16 @@ describe('/create command', () => {
 
         expect(mockEventService.createEvent).toHaveBeenCalledTimes(1);
         expect(mockEventDiscordService.createEventMessage).toHaveBeenCalledTimes(1);
-        expect(interaction.editReply).toHaveBeenCalledWith({ content: '✅ Event created successfully! ' });
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('✅ Event created successfully!'),
+            })
+        );
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('Interpreted as **America/New_York**'),
+            })
+        );
     });
 
     it('returns success with warning when event is saved but channel post fails', async () => {
@@ -222,9 +231,16 @@ describe('/create command', () => {
         await execute(interaction);
 
         expect(mockEventService.createEvent).toHaveBeenCalledTimes(1);
-        expect(interaction.editReply).toHaveBeenCalledWith({
-            content: '✅ Event created successfully!  ⚠️ Event was saved, but I could not post its embed in the target channel.',
-        });
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('✅ Event created successfully!'),
+            })
+        );
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('⚠️ Event was saved, but I could not post its embed in the target channel.'),
+            })
+        );
     });
 
     it('parses datetime with the dashboard server timezone', async () => {
@@ -282,8 +298,15 @@ describe('/create command', () => {
         await execute(interaction);
 
         expect(mockEventService.createRepeatingEvents).toHaveBeenCalledTimes(1);
-        expect(interaction.editReply).toHaveBeenCalledWith({
-            content: '✅ Event created successfully! + 2 repeating instances ',
-        });
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('✅ Event created successfully! + 2 repeating instances'),
+            })
+        );
+        expect(interaction.editReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: expect.stringContaining('Interpreted as **America/New_York**'),
+            })
+        );
     });
 });

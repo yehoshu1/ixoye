@@ -3,6 +3,7 @@ import {
     ChatInputCommandInteraction,
     ChannelType,
 } from 'discord.js';
+import { DateTime } from 'luxon';
 import { Command } from '../types/Command';
 import { eventService } from '../services/event-service';
 import { isSupportedPostChannel, getEventPollSettingsForGuild } from '../services/event-poll-settings-service';
@@ -231,16 +232,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const messagePostWarning = postedEventMessage
             ? ''
             : ' ⚠️ Event was saved, but I could not post its embed in the target channel.';
+        const startPreview = DateTime.fromJSDate(createdEvent.startTime)
+            .setZone(timezone)
+            .toFormat('ccc, LLL d yyyy h:mm a');
+        const timezoneNote = `Interpreted as **${timezone}** — starts ${startPreview} (${timezone})`;
         
         if (repeatInput !== 'NONE' && repeatUntil) {
             const repeatingEvents = await eventService.createRepeatingEvents(createdEvent);
             
             await sendCreateResponse(
                 interaction,
-                `✅ Event created successfully! ${repeatingEvents.length > 0 ? `+ ${repeatingEvents.length} repeating instances` : ''} ${mirrorText}${messagePostWarning}`
+                `✅ Event created successfully! ${repeatingEvents.length > 0 ? `+ ${repeatingEvents.length} repeating instances` : ''} ${mirrorText}${messagePostWarning}\n${timezoneNote}`
             );
         } else {
-            await sendCreateResponse(interaction, `✅ Event created successfully! ${mirrorText}${messagePostWarning}`);
+            await sendCreateResponse(interaction, `✅ Event created successfully! ${mirrorText}${messagePostWarning}\n${timezoneNote}`);
         }
 
         logger.info(`Event created: ${createdEvent.id} by ${interaction.user.tag} in ${guild.name}`);
