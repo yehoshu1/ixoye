@@ -13,6 +13,7 @@ import { pollService } from '../services/poll-service';
 import { isSupportedPostChannel } from '../services/event-poll-settings-service';
 import { getCommandPolicyContext } from '../services/command-policy-service';
 import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
+import { getEventPollSettingsForGuild } from '../services/event-poll-settings-service';
 import logger from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -112,6 +113,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const allowCustomOptions = interaction.options.getBoolean('allow_custom_options') || false;
         const endTimeInput = interaction.options.getString('end_time');
         const allowedRole = interaction.options.getRole('allowed_role');
+        const settings = await getEventPollSettingsForGuild(guild.id);
+        const timezone = settings?.serverTimezone || 'UTC';
 
         // Parse options
         const options = optionsInput.split(',').map(o => o.trim()).filter(o => o.length > 0);
@@ -126,10 +129,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
 
-        // Parse end time
+        // Parse end time using the same server timezone as /create
         let endTime: Date | null = null;
         if (endTimeInput) {
-            endTime = parseNaturalLanguageDate(endTimeInput);
+            endTime = parseNaturalLanguageDate(endTimeInput, timezone);
             if (!endTime) {
                 await sendPollResponse(interaction, 'Invalid end time format. Try something like "in 2 hours" or "tomorrow 5pm".');
                 return;
@@ -138,11 +141,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         // For time polls, parse dates from options
         let pollOptions: { text: string; emoji?: string; dateTimeValue?: Date }[];
-        
+
         if (pollType === 'TIME') {
             pollOptions = [];
             for (let i = 0; i < options.length; i++) {
-                const parsedDate = parseNaturalLanguageDate(options[i]);
+                const parsedDate = parseNaturalLanguageDate(options[i], timezone);
                 if (!parsedDate) {
                     await sendPollResponse(interaction, `Could not parse "${options[i]}" as a valid date/time.`);
                     return;

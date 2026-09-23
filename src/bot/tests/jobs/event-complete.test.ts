@@ -49,7 +49,7 @@ describe('event-complete job', () => {
         expect(mockEventService.markEventAsCompleted).toHaveBeenCalledWith('event-ended');
     });
 
-    it('uses duration fallback and default 60 minutes to complete overdue events', async () => {
+    it('uses duration fallback to complete overdue events and skips events with no end/duration', async () => {
         const { execute } = await import('../../jobs/event-complete');
 
         const now = Date.now();
@@ -62,7 +62,7 @@ describe('event-complete job', () => {
                 durationMinutes: 30,
             },
             {
-                id: 'event-default',
+                id: 'event-no-end',
                 guildId: 'guild-1',
                 startTime: new Date(now - 120 * 60_000),
                 endTime: null,
@@ -74,7 +74,8 @@ describe('event-complete job', () => {
         await execute({} as any);
 
         expect(mockEventService.markEventAsCompleted).toHaveBeenCalledWith('event-duration');
-        expect(mockEventService.markEventAsCompleted).toHaveBeenCalledWith('event-default');
+        expect(mockEventService.markEventAsCompleted).not.toHaveBeenCalledWith('event-no-end');
+        expect(mockEventService.markEventAsCompleted).toHaveBeenCalledTimes(1);
     });
 
     it('does not complete future events or disabled-module events', async () => {

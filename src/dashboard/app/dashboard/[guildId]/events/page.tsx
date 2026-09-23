@@ -76,6 +76,7 @@ import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-p
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import EventCalendar from "../../../../components/EventCalendar";
 import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
+import { pickerDateToUtc, utcToZonedPickerDate, isValidTimeZone } from "../../../../lib/timezone";
 
 function formatTimezone(tz: string): string {
     try {
@@ -323,6 +324,7 @@ function EventForm({
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [templates, setTemplates] = useState<EventTemplate[]>([]);
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+    const [serverTimezone, setServerTimezone] = useState("UTC");
     const sourceEvent = event || initialEvent;
     const [templateName, setTemplateName] = useState(
         sourceEvent?.title ? `${sourceEvent.title} Template` : ""
@@ -333,13 +335,13 @@ function EventForm({
         location: sourceEvent?.location || "",
         locationChannelId: sourceEvent?.locationChannelId || "",
         channelId: sourceEvent?.channelId || "",
-        startTime: sourceEvent?.startTime 
-            ? (initialEvent ? new Date(Date.now() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.startTime)) 
+        startTime: sourceEvent?.startTime
+            ? (initialEvent ? new Date(Date.now() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.startTime))
             : (initialDate || null),
-        endTime: sourceEvent?.endTime 
-            ? (initialEvent ? new Date(new Date(sourceEvent.endTime).getTime() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.endTime)) 
+        endTime: sourceEvent?.endTime
+            ? (initialEvent ? new Date(new Date(sourceEvent.endTime).getTime() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.endTime))
             : null,
-        durationMinutes: sourceEvent?.durationMinutes || null,
+        durationMinutes: sourceEvent?.durationMinutes ?? null,
         color: sourceEvent?.color || "#5865F2",
         maxAttendees: sourceEvent?.maxAttendees || null,
         enableWaitlist: sourceEvent?.enableWaitlist ?? true,
@@ -374,14 +376,20 @@ function EventForm({
     }
 
     async function fetchEventSettings() {
-        if (event) return;
         try {
             const res = await fetch(`/api/guilds/${guildId}/events/settings`);
             if (!res.ok) return;
             const data = await res.json();
+            const tz =
+                typeof data.serverTimezone === "string" && isValidTimeZone(data.serverTimezone)
+                    ? data.serverTimezone
+                    : "UTC";
+            setServerTimezone(tz);
             setFormData((prev) => ({
                 ...prev,
-                mirrorToDiscord: data.mirrorToDiscordEvents ?? true,
+                mirrorToDiscord: event
+                    ? prev.mirrorToDiscord
+                    : (data.mirrorToDiscordEvents ?? true),
             }));
         } catch (error) {
             console.error("Error fetching event settings:", error);
@@ -494,9 +502,11 @@ function EventForm({
                 location: formData.location || undefined,
                 locationChannelId: formData.locationChannelId || undefined,
                 channelId: formData.channelId,
-                startTime: formData.startTime.toISOString(),
-                endTime: formData.endTime?.toISOString() || undefined,
-                durationMinutes: formData.durationMinutes || undefined,
+                startTime: formData.startTime!.toISOString(),
+                // Always send endTime so clearing end time persists as null.
+                // Keep durationMinutes as-is (null when unset or end was cleared).
+                endTime: formData.endTime ? formData.endTime.toISOString() : null,
+                durationMinutes: formData.durationMinutes ?? null,
                 color: formData.color,
                 imageUrl: formData.imageUrl || undefined,
                 maxAttendees: formData.maxAttendees || undefined,
@@ -508,7 +518,7 @@ function EventForm({
                 blockedRoleIds: formData.blockedRoleIds.length > 0 ? formData.blockedRoleIds : undefined,
                 attendeeRoleId: formData.attendeeRoleId || undefined,
                 repeatFrequency: formData.repeatFrequency,
-                repeatUntil: formData.repeatUntil?.toISOString() || undefined,
+                repeatUntil: formData.repeatUntil ? formData.repeatUntil.toISOString() : null,
                 mirrorToDiscord: formData.mirrorToDiscord,
             };
 
@@ -547,15 +557,23 @@ function EventForm({
         }
     }
 
-    // Calculate end time based on duration
-    function updateEndTimeFromDuration(durationMinutes: number | null) {
-        if (!durationMinutes || !formData.startTime) return;
-        const start = new Date(formData.startTime);
-        const end = new Date(start.getTime() + durationMinutes * 60000);
-        setFormData((prev) => ({
-            ...prev,
-            endTime: end,
-        }));
+    // Shift an existing absolute end time when start moves; never invent an end.
+    function shiftEndTimeWithStart(start: Date, previousStart: Date | null, previousEnd: Date | null): Date | null {
+        if (!previousEnd) return null;
+        if (!previousStart) return previousEnd;
+        const deltaMs = start.getTime() - previousStart.getTime();
+        return new Date(previousEnd.getTime() + deltaMs);
+    }
+
+    // Absolute end for a quick-duration pick (form stores UTC instants).
+    function endTimeFromDuration(durationMinutes: number | null): Date | null {
+        if (!durationMinutes || !formData.startTime) return null;
+        return new Date(formData.startTime.getTime() + durationMinutes * 60000);
+    }
+
+    // Picker wall-clock → absolute UTC using the server timezone.
+    function onPickedWallClock(date: Date | null): Date | null {
+        return pickerDateToUtc(date, serverTimezone);
     }
 
     return (
@@ -631,25 +649,44 @@ function EventForm({
                         Start Time <span className="text-red-500">*</span>
                     </Label>
                     <DateTimePicker
-                        value={formData.startTime}
+                        value={utcToZonedPickerDate(formData.startTime, serverTimezone)}
                         onChange={(date) => {
-                            setFormData({ ...formData, startTime: date });
-                            if (date && formData.durationMinutes) {
-                                updateEndTimeFromDuration(formData.durationMinutes);
-                            }
+                            const absolute = onPickedWallClock(date);
+                            setFormData((prev) => {
+                                const next = { ...prev, startTime: absolute };
+                                // Only keep an existing end time in sync — never auto-create one.
+                                if (absolute && prev.endTime) {
+                                    next.endTime = shiftEndTimeWithStart(
+                                        absolute,
+                                        prev.startTime,
+                                        prev.endTime
+                                    );
+                                }
+                                return next;
+                            });
                         }}
                         placeholder="Select start date and time"
                     />
+                    {serverTimezone !== "UTC" && (
+                        <HelperText>
+                            Times use {formatTimezone(serverTimezone)} — same as /create.
+                        </HelperText>
+                    )}
                 </div>
                 <div className="space-y-2.5">
                     <Label>End Time</Label>
                     <DateTimePicker
-                        value={formData.endTime}
+                        value={utcToZonedPickerDate(formData.endTime, serverTimezone)}
                         onChange={(date) =>
-                            setFormData({ ...formData, endTime: date })
+                            setFormData((prev) => ({
+                                ...prev,
+                                endTime: onPickedWallClock(date),
+                                // Clearing end also clears duration so no phantom end remains.
+                                durationMinutes: date ? prev.durationMinutes : null,
+                            }))
                         }
                         placeholder="Select end date and time"
-                        minDate={formData.startTime || undefined}
+                        minDate={utcToZonedPickerDate(formData.startTime, serverTimezone) || undefined}
                         allowClear={true}
                     />
                 </div>
@@ -670,8 +707,11 @@ function EventForm({
                             }
                             size="sm"
                             onClick={() => {
-                                setFormData({ ...formData, durationMinutes: mins });
-                                updateEndTimeFromDuration(mins);
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    durationMinutes: mins,
+                                    endTime: endTimeFromDuration(mins) ?? prev.endTime,
+                                }));
                             }}
                         >
                             {mins >= 60 ? `${mins / 60}h` : `${mins}m`}

@@ -697,6 +697,8 @@ export class EventService {
             return undefined;
         }
 
+        // Discord requires an end time for external events, but we only derive
+        // one for the Discord API — we do not persist an end time on the event.
         const durationMinutes = eventData.durationMinutes && eventData.durationMinutes > 0
             ? eventData.durationMinutes
             : 60;
