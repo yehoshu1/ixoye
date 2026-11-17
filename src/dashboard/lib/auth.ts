@@ -5,6 +5,11 @@ import logger from "./logger";
 export const authOptions: NextAuthOptions = {
     providers: [
         DiscordProvider({
+            // Discord now sends an RFC 9207 `iss` parameter on OAuth callbacks.
+            // openid-client validates it against the provider's issuer, which the
+            // built-in Discord provider leaves unset, so every sign-in fails with
+            // "issuer must be configured on the issuer" (OAuthCallback).
+            issuer: "https://discord.com",
             clientId: process.env.DISCORD_CLIENT_ID!,
             clientSecret: process.env.DISCORD_CLIENT_SECRET!,
             authorization: { params: { scope: "identify guilds" } },
