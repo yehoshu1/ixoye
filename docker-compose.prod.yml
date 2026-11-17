@@ -58,23 +58,23 @@ services:
       postgres:
         condition: service_healthy
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: ixoye-caddy
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN:?Set DOMAIN in .env (e.g. bot.example.com)}
-      ACME_EMAIL: ${ACME_EMAIL:-}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - ixoye
+#  caddy:
+#    image: caddy:2-alpine
+#    container_name: ixoye-caddy
+#    restart: always
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#      - "443:443/udp"
+#    environment:
+#     DOMAIN: ${DOMAIN:?Set DOMAIN in .env (e.g. bot.example.com)}
+#      ACME_EMAIL: ${ACME_EMAIL:-}
+#    volumes:
+#      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+#      - caddy_data:/data
+#      - caddy_config:/config
+#    depends_on:
+#      - ixoye
 
   ixoye-pg-backup:
     image: postgres:17
